@@ -277,9 +277,13 @@ class Repository:
 
         try:
             for cwid, name, major in file_reader(os.path.join(self._path, "students.txt"), 3, sep=";", header=True):
-                required: List[str] = self._majors[major].get_required()
-                electives: List[str] = self._majors[major].get_electives()
-                self._students[cwid] = Student(cwid, name, major, required, electives)
+                if major in self._majors:
+                    required: List[str] = self._majors[major].get_required()
+                    electives: List[str] = self._majors[major].get_electives()
+                    self._students[cwid] = Student(cwid, name, major, required, electives)
+                else:
+                    self._students[cwid] = Student(cwid, name, major, "Unknown for this major", "Unknown for this major")
+                    print(f"Unknown Major {major} found in students.txt")
 
         except (FileNotFoundError, ValueError) as e:
             print(e)
@@ -362,3 +366,5 @@ class Repository:
                 pt.add_row(info)
 
         print("Instructor Summary\n",pt)
+
+a = Repository(r"C:\Users\Chris\Desktop\HW10")   
