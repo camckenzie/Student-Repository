@@ -2,7 +2,7 @@
 The purpose of this program is to create a data repository of
 majors, courses, students and instructors. It will track Student
 CWIDs, names, majors, completed courses, remaining required courses,
-remaining electives, and cumulative GPA, as well as Instructor IDs,
+remaining electives, grade, and cumulative GPA, as well as Instructor IDs,
 departments, courses taught, and number of students taught.
 Additionally, it will store Majors and their respective required
 courses and electives.
@@ -10,9 +10,10 @@ courses and electives.
 
 from typing import DefaultDict, Tuple, Iterator, List, Dict, IO
 from collections import defaultdict
-import os
+import os, sqlite3
 from prettytable import PrettyTable
 from HW08_Christopher_McKenzie import file_reader
+
 
 class Student:
     
@@ -226,6 +227,8 @@ class Repository:
     8. Print a major prettytable.
     9. Print a student prettytable.
     10. Print an instructor prettytable.
+    11. Print a student grades pretty table using data from a table
+    in an SQLite database file.
     """
 
 
@@ -251,6 +254,7 @@ class Repository:
             self.major_pretty_table()
             self.student_pretty_table()
             self.instructor_pretty_table()
+            self.student_grades_table_db()
 
     def _read_majors(self, path: str) -> None:
 
@@ -276,7 +280,7 @@ class Repository:
         """
 
         try:
-            for cwid, name, major in file_reader(os.path.join(self._path, "students.txt"), 3, sep=";", header=True):
+            for cwid, name, major in file_reader(os.path.join(self._path, "students.txt"), 3, sep="\t", header=True):
                 if major in self._majors:
                     required: List[str] = self._majors[major].get_required()
                     electives: List[str] = self._majors[major].get_electives()
@@ -295,7 +299,7 @@ class Repository:
         """
 
         try:
-            for cwid, name, dept in file_reader(os.path.join(self._path, "instructors.txt"), 3, sep="|", header=True):
+            for cwid, name, dept in file_reader(os.path.join(self._path, "instructors.txt"), 3, sep="\t", header=True):
                 self._instructors[cwid] = Instructor(cwid, name, dept)
         except (FileNotFoundError, ValueError) as e: 
             print(e)
@@ -311,7 +315,7 @@ class Repository:
         """
 
         try:
-            for student_cwid, course, grade, instructor_cwid in file_reader(os.path.join(self._path, "grades.txt"), 4, sep="|", header=True):
+            for student_cwid, course, grade, instructor_cwid in file_reader(os.path.join(self._path, "grades.txt"), 4, sep="\t", header=True):
 
                 if student_cwid not in self._students:
                     print(f"Unknown Student CWID {student_cwid} found in grades.txt")
@@ -340,7 +344,7 @@ class Repository:
         for major in self._majors.values():
             pt.add_row(major.info())
 
-        print(pt)
+        print("Majors Summary \n", pt)
 
     def student_pretty_table(self) -> None:
 
@@ -367,4 +371,31 @@ class Repository:
 
         print("Instructor Summary\n",pt)
 
-a = Repository(r"C:\Users\Chris\Desktop\HW10")   
+    def student_grades_table_db(self) -> None:
+
+        """Prints pretty table using info from table in SQLite
+        database file.
+        """
+
+        DB_FILE: str = r"C:\Users\Chris\Desktop\HW11\HW11_Database.db"
+        
+        try: 
+            db: sqlite3.Connection = sqlite3.connect(DB_FILE)
+        except sqlite3.OperationalError:
+            print("Missing SQLite database.")
+        else:
+            PT_FIELD_NAMES: List[str] = ["Name", "CWID", "Course", "Grade", "Instructor"]
+            pt: PrettyTable = PrettyTable(field_names=Instructor.PT_FIELD_NAMES)
+            
+            query: str = """select s.Name as Student, s.CWID, g.Course, g.Grade, i.Name as Instructor
+                            from students s
+                                join grades g on s.CWID=g.StudentCWID
+                                join instructors i on i.CWID=g.InstructorCWID
+                                order by Student"""
+        
+            try:
+                for row in db.execute(query):
+                    pt.add_row(row)
+                print("Student Grade Summary \n", pt)
+            except sqlite3.OperationalError as e:
+                print("Missing SQLite database.")
